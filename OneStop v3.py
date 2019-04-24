@@ -2,7 +2,18 @@
 """
 Created on Wed Nov 28 16:23:26 2018
 
-@author: Thomas Tessier
+@author: Thomas Muse-Tessier
+
+The purpose of this script is to combine three previously separate database queries and actions into a single, "One Stop Shop." 
+1 - Construct a locally saved subset of the online FCC database, focusing on the information needed to identify which cell carriers
+    are licensed to operate in which frequency blocks for a given county and state in the United States
+  - Perform searches of a county and state, returning all cell carrier licenses for that county and state bsaed on the above data and
+    export the information to a .csv
+2 - Construct a locally saved subset of the online FCC database, focusing on the information needed to identify microwave antennas and
+    omni/whip antennas and their geographical location
+  - Perform searches of the above data, returning the microwave and omni antennas within a given radius of a geographical point.
+3 - Construct a locally saved subset of the online FCC database, focusing on identifying information for FM, AM and TV antennas
+  - Perform searches of the above data, returning the FM, AM and TV antennas within a given radius of a provided geographical point
 """
 
 import tkinter as tk
@@ -390,7 +401,7 @@ class DBT:
     
     def MicroSearch(frame,LatDec,LongDec):
         '''
-        Search for microwaves and omnis within one second
+        Search for microwaves and omnis within fifteen seconds (roughly one qaurter mile)
         '''    
         Show(frame,'Working...')
         Radius=15/3600
