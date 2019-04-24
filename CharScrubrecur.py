@@ -2,7 +2,10 @@
 """
 Created on Mon Aug 27 15:12:44 2018
 
-@author: Thomas Tessier
+@author: Thomas Muse-Tessier
+
+This script was developed to recursively comb through Waterford's internal database of antenna files and clean the data within. This was
+done by removing invalid characters, verifying that all datafields were present, and reformatting as needed.
 """
 import os
 validchars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz !"#$%&\'()*+,-./0123456789:;<=>?@[]\^_`{}|~\n'
