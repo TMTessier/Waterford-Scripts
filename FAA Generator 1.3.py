@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
 """
+Created on Tue May  7 09:16:04 2019
+
+@author: Thomas Tessier
+"""
+
+# -*- coding: utf-8 -*-
+"""
 Created on Tue Aug 28 12:39:53 2018
 
 @author: Thomas Tessier
@@ -47,11 +54,9 @@ def clean(line):
 
 merge={}
 filenames=input('Type in the name of the desired report files\n (Exactly the same as put into Airspace, no file extension)\n : ')
-print('Not everything I need is in the reports, unfortunately.')
-OverExisting=bool(input('Type in True if I need to worry about an existing structure getting taller.\n Otherwise type False\n : '))
+OverExisting=bool(input('Type in True if an existing structure is getting taller.\n Otherwise press Enter\n : '))
 merge['Customer']=input("Who's the customer? \n : ")
-merge['ProjectNum']=input('Got a project number?\n : ')
-merge['Writer']=input("Thanks, buddy. What's your name?")
+merge['Writer']=input("Report Writer's Name?\n : ")
 
 
 from mailmerge import MailMerge
@@ -72,93 +77,73 @@ Reading and extracting heights from 77.9 rules and check if TERPS analysis neede
 '''
 
 for x in range(len(lines)):
-    if lines[x]=='     NOTICE CRITERIA\n':
+    if 'NOTICE CRITERIA' in lines[x]:
         search=x
         break
-Rules779={search+1:'77.9(a)',search+2:'77.9(b)'}
-NoNotice=200
-NoNoticeSL=0
-merge['RuleSeven']=''
-if lines[search+1][20:22]=='NR':
-    merge['RuleSeven']=Rules779[search+1]
+Rules779={search+1:'77.9(a)',search+2:'77.9(b)','IFR':'IFR Straight-In'}
 
-if lines[search+2][20]=='N' and lines[search+2][21]=='R':
+merge['RuleSeven']=''
+if 'Exceeds' in lines[search+1]:
+    merge['RuleSeven']='77.9(a)'
+
+if 'Exceeds' in lines[search+2]:
     testline=lines[search+2].split(' ')
     testline=clean(testline)
-    for e in testline:
-        try:
-            x=int(e)
-        except:
-            pass
-    NoNoticeSL=x
-    merge['RuleSeven']=Rules779[search+2]
+    NoNoticeSL=int(testline[-2])
+    merge['RuleSeven']='77.9(b)'
 
 
 TERPSNeed=False
 for i in range(search+3,search+7):
-    if lines[i] != '\n' and lines[i][20]=='N' and lines[i][21]=='R':
+    if 'TERPS' in lines[i]:
         TERPSNeed=True
-merge['NoNotice']=str(NoNotice)
 
-'''
-Grab designation of nearest airport
-'''
-airportline=lines[search+4].split(' ')
-airportline=clean(airportline)
-if airportline[2]=='NR':
-    desig=airportline[4]
-else:
-    desig=airportline[-2]
-if desig=='with' or desig=='for':
-    desig=airportline[-1][:3]
- 
-merge['AirportID']=desig
-       
-'''
-Reading and extracting heights from 77.17 and 77.19
-'''
-for x in range(search, len(lines)):
-    if lines[x]=='     OBSTRUCTION STANDARDS\n':
+ifr=search+14
+while 'OBSTRUCTION' not in lines[ifr]:
+    if 'maximum height to avoid' in lines[ifr]:
+        testline=lines[ifr].split(' ')
+        testline=clean(testline)
+        testval=int(round(float(testline[-3])))
+        if testval < NoNoticeSL:
+            NoNoticeSL=testval
+            merge['RuleSeven']='IFR Straight-In'
+    ifr+=1
+
+Limiters={}
+
+for x in range(len(lines)):
+    if '77.17(a)(3)' in lines[x]:
         search=x
         break
-Hazard=499
-Study=499
-HazardSL=0
-StudySL=0
-Hazardtest=499
-Rules1719={search+1:'77.17(a)(1)', search+2:'77.17(a)(2)', search+3:'77.19(a)', search+4:'77.19(b)', search+5:'77.19(c)', search+6:'77.19(d)', search+7:'77.19(e)', search+8:'77.19(e)'}
-merge['RuleSeventeen']=''
-merge['RuleNineteen']=''
-if lines[search+1][24]=='E':
-    merge['RuleSeventeen']=Rules1719[search+1]
+testline=lines[search+1].split(' ')
+testline=clean(testline)
+try:
+    Limiters['77.17(a)(3)']=int(testline[-3])
+except:
+        pass
 
-if lines[search+2][24]=='E':
-    testline=lines[search+2].split(' ')
-    testline=clean(testline)
-    for e in testline:
-        try:
-            x=int(e)
-        except:
-            pass
-    StudySL=x
-    merge['RuleSeventeen']=Rules1719[search+2]
-    
+for x in range(len(lines)):
+    if 'MOCA' in lines[x]:
+        search=x
+        break
+testline=lines[search+2].split(' ')
+testline=clean(testline)
+Limiters['MOCA']=int(testline[-3])
 
-for i in range(search+3,search+9):
-    if lines[i][24]=='E':
-        testline=lines[i].split(' ')
+
+for x in range(len(lines)):
+    if 'TRAFFIC PATTERN' in lines[x]:
+        search=x
+        break
+while 'TERPS' not in lines[search]:
+    if 'Maximum AMSL' in lines[search]:
+        testline=lines[search].split(' ')
         testline=clean(testline)
-        for e in testline:
-            try:
-                x=int(e)
-            except:
-                pass
-        HazardSL=x
-        Hazardtest=x
-        merge['RuleNineteen']=Rules1719[i]
-    
+        Limiters['VFR']=int(testline[-2])
+    search+=1
 
 
+        
 '''
 Address
 '''
@@ -209,36 +194,10 @@ merge['StudyHeight'] = heightline[0]
 totalline=lines[16].split('......')
 totalline=totalline[1].split(' ')
 merge['TotalHeight'] = totalline[0]
+totalheight=int(totalline[0])
 
-'''
-Creating AMSL heights from rules
-'''
-if NoNoticeSL==0:
-    NoNoticeSL=NoNotice+elev
-else:
-    NoNotice=NoNoticeSL-elev
-    
-if StudySL==0:
-    StudySL=Study+elev
-else:
-    Study=StudySL-elev
 
-if HazardSL==0:
-    HazardSL=Hazard+elev
-else:
-    Hazard=HazardSL-elev    
-
-if Hazard < Study:
-    Study=Hazard
-    StudySL=HazardSL
-
-merge['NoNoticeSL']=str(NoNoticeSL)
-merge['NoNotice']=str(NoNotice)
-merge['StudySL']=str(StudySL)
-merge['Study']=str(Study)
-merge['HazardSL']=str(HazardSL)
-merge['Hazard']=str(Hazard)
-
+NoNotice=NoNoticeSL-elev
 
 '''
 Proposed or Existing
@@ -253,6 +212,118 @@ elif sowline[1][0]=='E':
     merge['Describe']='proposed changes to the existing structure'
 else:
     print('Oops')
+
+'''
+Check for Private Air facilities
+'''
+
+for x in range(search, len(lines)):
+    if 'PRIVATE' in lines[x]:
+        search=x
+        break
+Private=False
+while 'NAVIGATION' not in lines[search]:
+    if 'Possible Impact' in lines[search]:
+        Private=True
+        break
+    search+=1
+    
+if Private:
+    merge['PrivateAir']='Private use landing facilities are a potential factor for this location.'
+else:
+    merge['PrivateAir']='Private use landing facilities are not a factor for this location.'    
+
+'''
+Check for AM Stations
+'''
+for x in range(search, len(lines)):
+    if 'CFR Title 47' in lines[x]:
+        search=x
+        break
+AM=False
+amline=lines[search+1].split(' ')
+amline=clean(amline)
+if amline[3]=='REQUIRED':
+    AM=True
+    
+if AM:
+    merge['AMStudy']='An AM study is required.'
+else:
+    merge['AMStudy']='An AM study is not required.'
+
+
+'''
+Copy report
+'''
+fh.seek(0)
+merge['SummaryReport']=fh.read()
+
+'''
+close file
+'''     
+fh.close() 
+
+        
+'''
+Reading and extracting heights from 77.17 and 77.19
+'''
+
+Hazard=499
+Study=499
+HazardSL=Hazard+elev
+StudySL=Study+elev
+
+
+far=open('.\\Airspace Files\\'+filenames+'.FAR','r')
+farlines=far.readlines()
+search=0
+rules=['77.17(a)(1)','77.17(a)(2)','77.19 (a)','77.19(b)','77.19(c)','77.19(e)','77.19(d)']
+for rule in rules:
+    for x in range(search,len(farlines)):
+        if rule in farlines[x]:
+            search=x+1
+            break
+    while 'A height' not in farlines[search]:
+        if 'ALLOWABLE HEIGHT' in farlines[search]:
+            line=farlines[search].split(' ')
+            line=clean(line)
+            Limiters[rule]=int(line[-3])
+            break
+        if 'SURFACE HEIGHT' in farlines[search]:
+            line=farlines[search].split(' ')
+            line=clean(line)
+            Limiters[rule]=int(float(line[-2]))
+            break
+        search+=1
+studyrule=''
+hazardrule=''
+for rule in Limiters:
+    if StudySL > Limiters[rule]:
+        HazardSL=StudySL
+        hazardrule=studyrule
+        StudySL=Limiters[rule]
+        studyrule=rule
+    
+Hazard=HazardSL-elev
+Study=StudySL-elev
+
+if StudySL<totalheight:
+    merge['RuleSeventeen']=studyrule
+if HazardSL<totalheight:
+    merge['RuleNineteen']=hazardrule
+
+
+
+
+far.close()
+
+merge['NoNoticeSL']=str(NoNoticeSL)
+merge['NoNotice']=str(NoNotice)
+merge['StudySL']=str(StudySL)
+merge['Study']=str(Study)
+merge['HazardSL']=str(HazardSL)
+merge['Hazard']=str(Hazard)
+
 
 '''
 Specific Report Language
@@ -275,55 +346,11 @@ else:
     merge['NoticeRequire']='Notice is not required'
     merge['NoticeExpl']='At this proposed height, there will be no increase to the overall existing structure height.'
 
-'''
-Check for Private Air facilities
-'''
 
-for x in range(search, len(lines)):
-    if lines[x]=='     PRIVATE LANDING FACILITIES\n':
-        search=x
-        break
-Private=False
-for x in range(search,len(lines)):
-    if lines[x]=='       Possible Impact to Private landing Facility\n':
-        Private=True
-        break
-    elif lines[x]=='     AIR NAVIGATION ELECTRONIC FACILITIES\n':
-        break
-
-if Private:
-    merge['PrivateAir']='Private use landing facilities are a potential factor for this location.'
-else:
-    merge['PrivateAir']='Private use landing facilities are not a factor for this location.'    
 
 '''
-Check for AM Stations
+Airport File
 '''
-for x in range(search, len(lines)):
-    if lines[x]=='     CFR Title 47, §1.30000-§1.30004\n':
-        search=x
-        break
-AM=False
-amline=lines[search+1].split(' ')
-amline=clean(amline)
-if amline[3]=='REQUIRED':
-    AM=True
-    
-if AM:
-    merge['AMStudy']='An AM study is required.'
-else:
-    merge['AMStudy']='An AM study is not required.'
-
-'''
-Copy report
-'''
-fh.seek(0)
-merge['SummaryReport']=fh.read()
-
-'''
-switch to Airport file
-'''     
-fh.close() 
 fh=open('.\\Airspace Files\\'+filenames+'.APT','r') 
 lines=fh.readlines()
 
@@ -331,12 +358,9 @@ lines=fh.readlines()
 Find correct airport and extract info
 '''
 
-for i in range(17,len(lines)):
-    if clean(lines[i].split(' '))[0]==desig:
-        search=i
-        break
-airportline=lines[search].split(' ')
+airportline=lines[17].split(' ')
 airportline=clean(airportline)
+merge['AirportID']=airportline[0]
 merge['AirportDist']=airportline[-3]
 merge['AirportBear']=airportline[-4]
 namestring=airportline[2:-4]     
